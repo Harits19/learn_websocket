@@ -14,11 +14,11 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-
 func main() {
 	flag.Parse()
 	hub := newHub()
 	go hub.run()
+	go hub.sendContinousMessage()
 	http.HandleFunc("/", serveHome)
 	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
 		serveWs(hub, w, r)
@@ -29,7 +29,7 @@ func main() {
 	}
 }
 
-var addr = flag.String("addr", ":8080", "http service address")
+var addr = flag.String("addr", ":3021", "http service address")
 
 func serveHome(w http.ResponseWriter, r *http.Request) {
 	log.Println(r.URL)
@@ -66,7 +66,7 @@ var (
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
-	CheckOrigin: func(r *http.Request) bool {return true},
+	CheckOrigin:     func(r *http.Request) bool { return true },
 }
 
 // Client is a middleman between the websocket connection and the hub.
@@ -213,5 +213,21 @@ func (h *Hub) run() {
 				}
 			}
 		}
+
 	}
+}
+
+func (h *Hub) sendContinousMessage() {
+	for {
+		time.Sleep(4 * time.Second)
+		for client := range h.clients {
+			select {
+			case client.send <- []byte(time.Now().String()):
+			default:
+				close(client.send)
+				delete(h.clients, client)
+			}
+		}
+	}
+
 }
