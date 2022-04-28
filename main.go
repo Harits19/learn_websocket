@@ -12,24 +12,31 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/rs/cors"
 )
+
+var hub *Hub
 
 func main() {
 	flag.Parse()
-	hub := newHub()
+	hub = newHub()
+	mux := http.NewServeMux()
 	go hub.run()
 	go hub.sendContinousMessage()
-	http.HandleFunc("/", serveHome)
-	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
-		serveWs(hub, w, r)
-	})
-	err := http.ListenAndServe(*addr, nil)
+	mux.HandleFunc("/", serveHome)
+	mux.HandleFunc("/ws", serveWsHandler)
+	handler := cors.AllowAll().Handler(mux)
+	err := http.ListenAndServe(":3021", handler)
 	if err != nil {
 		log.Fatal("ListenAndServe: ", err)
 	}
 }
 
 var addr = flag.String("addr", ":3021", "http service address")
+
+func serveWsHandler(w http.ResponseWriter, r *http.Request) {
+	serveWs(hub, w, r)
+}
 
 func serveHome(w http.ResponseWriter, r *http.Request) {
 	log.Println(r.URL)
